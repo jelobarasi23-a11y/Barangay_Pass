@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install",
+  "regions": ["sin1"],
+  "env": {
+    "NEXT_PUBLIC_STELLAR_NETWORK": "TESTNET",
+    "NEXT_PUBLIC_SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org"
+  }
+}
