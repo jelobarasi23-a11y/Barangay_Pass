@@ -14,6 +14,8 @@ import {
   AlertCircle,
   ExternalLink,
   ArrowRight,
+  Copy,
+  ShieldCheck,
 } from "lucide-react";
 
 type Step = "connect" | "review" | "signing" | "submitting" | "done" | "error";
@@ -21,8 +23,7 @@ type Step = "connect" | "review" | "signing" | "submitting" | "done" | "error";
 function RegisterForm() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get("event");
-  const { isConnected, publicKey, connect, connecting, signXdr } =
-    useFreighter();
+  const { isConnected, publicKey, connect, connecting, signXdr } = useFreighter();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [step, setStep] = useState<Step>("connect");
@@ -62,7 +63,6 @@ function RegisterForm() {
     try {
       setStep("signing");
 
-      // Build and simulate entirely client-side using stellar-sdk in browser
       const StellarSdk = await import("@stellar/stellar-sdk");
       const { rpc } = await import("@stellar/stellar-sdk");
 
@@ -72,9 +72,7 @@ function RegisterForm() {
       );
 
       const account = await server.getAccount(publicKey);
-      const paymentAmount = BigInt(
-        Math.round(event.fee_xlm * 10_000_000)
-      );
+      const paymentAmount = BigInt(Math.round(event.fee_xlm * 10_000_000));
 
       const tx = new StellarSdk.TransactionBuilder(account, {
         fee: "1000000",
@@ -91,22 +89,16 @@ function RegisterForm() {
         .setTimeout(30)
         .build();
 
-      // Simulate client-side
       const sim = await server.simulateTransaction(tx) as any;
-      console.log("Sim result:", sim);
 
       if (sim.error && !sim.transactionData) {
         throw new Error(`Simulation failed: ${sim.error}`);
       }
 
-      // Assemble with footprint
       const assembled = rpc.assembleTransaction(tx, sim).build();
       const xdr = assembled.toXDR();
-
-      // Sign with Freighter
       const signedXdr = await signXdr(xdr);
 
-      // Submit via server
       setStep("submitting");
       const saveRes = await fetch("/api/save-registration", {
         method: "POST",
@@ -133,10 +125,20 @@ function RegisterForm() {
     }
   };
 
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied!`);
+  };
+
   if (!eventId) {
     return (
       <div className="pt-24 px-4 max-w-lg mx-auto text-center py-20">
-        <p className="text-gray-400">No event selected. <a href="/events" className="text-brand-400 underline">Browse events</a></p>
+        <p className="text-gray-400">
+          No event selected.{" "}
+          <a href="/events" className="text-brand-400 underline">
+            Browse events
+          </a>
+        </p>
       </div>
     );
   }
@@ -149,39 +151,49 @@ function RegisterForm() {
       >
         Register for Event
       </h1>
-      <p className="text-gray-400 mb-8">Your registration will be recorded on Stellar.</p>
+      <p className="text-gray-400 mb-8">
+        Your registration will be recorded on Stellar.
+      </p>
 
       {/* Progress steps */}
       <div className="flex items-center gap-2 mb-8">
-        {(["connect", "review", "signing", "submitting", "done"] as Step[]).map((s, i) => {
-          const steps = ["connect", "review", "signing", "submitting", "done"];
-          const current = steps.indexOf(step);
-          const pos = steps.indexOf(s);
-          const labels = ["Connect", "Review", "Sign", "Submit", "Done"];
-          return (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  pos < current
-                    ? "bg-brand-500 text-white"
-                    : pos === current
-                    ? "bg-brand-500/20 border border-brand-500 text-brand-400"
-                    : "bg-dark-600 text-gray-600"
-                }`}
-              >
-                {pos < current ? <CheckCircle size={14} /> : i + 1}
+        {(["connect", "review", "signing", "submitting", "done"] as Step[]).map(
+          (s, i) => {
+            const steps = ["connect", "review", "signing", "submitting", "done"];
+            const current = steps.indexOf(step);
+            const pos = steps.indexOf(s);
+            const labels = ["Connect", "Review", "Sign", "Submit", "Done"];
+            return (
+              <div key={s} className="flex items-center gap-2">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    pos < current
+                      ? "bg-brand-500 text-white"
+                      : pos === current
+                      ? "bg-brand-500/20 border border-brand-500 text-brand-400"
+                      : "bg-dark-600 text-gray-600"
+                  }`}
+                >
+                  {pos < current ? <CheckCircle size={14} /> : i + 1}
+                </div>
+                <span
+                  className={`text-xs hidden sm:block ${
+                    pos === current ? "text-brand-400" : "text-gray-600"
+                  }`}
+                >
+                  {labels[i]}
+                </span>
+                {i < 4 && (
+                  <div
+                    className={`h-px w-4 ${
+                      pos < current ? "bg-brand-500" : "bg-dark-600"
+                    }`}
+                  />
+                )}
               </div>
-              <span
-                className={`text-xs hidden sm:block ${
-                  pos === current ? "text-brand-400" : "text-gray-600"
-                }`}
-              >
-                {labels[i]}
-              </span>
-              {i < 4 && <div className={`h-px w-4 ${pos < current ? "bg-brand-500" : "bg-dark-600"}`} />}
-            </div>
-          );
-        })}
+            );
+          }
+        )}
       </div>
 
       {/* Event card */}
@@ -191,7 +203,8 @@ function RegisterForm() {
           <p className="text-gray-400 text-sm mb-3">
             {new Date(event.date).toLocaleDateString("en-PH", {
               dateStyle: "full",
-            })} · {event.location}
+            })}{" "}
+            · {event.location}
           </p>
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-400">Registration fee</span>
@@ -246,9 +259,18 @@ function RegisterForm() {
         <div className="glass rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-400 text-sm">Your wallet</span>
-            <span className="font-mono text-xs text-brand-300 bg-dark-700 px-2 py-1 rounded">
-              {publicKey?.slice(0, 8)}...{publicKey?.slice(-6)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-brand-300 bg-dark-700 px-2 py-1 rounded">
+                {publicKey?.slice(0, 8)}...{publicKey?.slice(-6)}
+              </span>
+              <button
+                onClick={() => copyToClipboard(publicKey || "", "Address")}
+                className="text-gray-500 hover:text-brand-400 transition-colors"
+                title="Copy full address"
+              >
+                <Copy size={13} />
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between mb-6">
             <span className="text-gray-400 text-sm">Transaction type</span>
@@ -258,7 +280,8 @@ function RegisterForm() {
             onClick={handleRegister}
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
-            Register & Pay {event?.fee_xlm ? `${event.fee_xlm} XLM` : "(Free)"}
+            Register & Pay{" "}
+            {event?.fee_xlm ? `${event.fee_xlm} XLM` : "(Free)"}
             <ArrowRight size={16} />
           </button>
         </div>
@@ -281,31 +304,77 @@ function RegisterForm() {
           <Loader2 size={32} className="text-brand-400 mx-auto mb-4 animate-spin" />
           <h3 className="text-white font-semibold mb-2">Submitting to Stellar</h3>
           <p className="text-gray-400 text-sm">
-            Your transaction is being confirmed on-chain. This may take a few seconds.
+            Your transaction is being confirmed on-chain. This may take a few
+            seconds.
           </p>
         </div>
       )}
 
       {/* Done step */}
       {step === "done" && txHash && (
-        <div className="glass rounded-xl p-8 text-center border border-emerald-800/40 bg-emerald-900/10">
-          <CheckCircle size={40} className="text-emerald-400 mx-auto mb-4" />
-          <h3 className="text-white font-semibold text-xl mb-2">You're registered!</h3>
-          <p className="text-gray-400 text-sm mb-6">
-            Your registration has been recorded on the Stellar blockchain.
-          </p>
-          <div className="bg-dark-700 rounded-lg p-3 mb-4 break-all">
-            <p className="text-xs text-gray-500 mb-1">Transaction hash</p>
-            <p className="font-mono text-xs text-brand-300">{txHash}</p>
+        <div className="space-y-4">
+          {/* Success header */}
+          <div className="glass rounded-xl p-6 text-center border border-emerald-800/40 bg-emerald-900/10">
+            <CheckCircle size={40} className="text-emerald-400 mx-auto mb-3" />
+            <h3
+              className="text-white font-semibold text-xl mb-1"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              You're registered!
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Your registration has been recorded on the Stellar blockchain.
+            </p>
           </div>
-          <a
-            href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-brand-400 text-sm hover:underline"
-          >
-            View on Stellar Expert <ExternalLink size={14} />
-          </a>
+
+          {/* Wallet address for verification — prominent */}
+          <div className="glass rounded-xl p-5 border border-brand-500/20">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck size={16} className="text-brand-400" />
+              <p className="text-sm font-semibold text-white">
+                Your verification wallet address
+              </p>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Show this address to barangay staff when checking in. They will use it to verify your registration.
+            </p>
+            <div className="bg-dark-700 rounded-lg p-3 flex items-center justify-between gap-3">
+              <p className="font-mono text-xs text-brand-300 break-all flex-1">
+                {publicKey}
+              </p>
+              <button
+                onClick={() => copyToClipboard(publicKey || "", "Wallet address")}
+                className="flex-shrink-0 p-1.5 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 transition-colors"
+                title="Copy address"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Transaction hash */}
+          <div className="glass rounded-xl p-5">
+            <p className="text-xs text-gray-500 mb-2">Transaction hash</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-xs text-brand-300 break-all flex-1">
+                {txHash}
+              </p>
+              <button
+                onClick={() => copyToClipboard(txHash, "Transaction hash")}
+                className="flex-shrink-0 text-gray-500 hover:text-brand-400 transition-colors"
+              >
+                <Copy size={13} />
+              </button>
+            </div>
+            <a
+              href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-brand-400 text-xs hover:underline mt-3"
+            >
+              View on Stellar Expert <ExternalLink size={12} />
+            </a>
+          </div>
         </div>
       )}
 
@@ -315,12 +384,17 @@ function RegisterForm() {
           <div className="flex items-start gap-3">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-red-400 font-semibold text-sm mb-1">Registration failed</p>
+              <p className="text-red-400 font-semibold text-sm mb-1">
+                Registration failed
+              </p>
               <p className="text-gray-400 text-sm">{error}</p>
             </div>
           </div>
           <button
-            onClick={() => { setStep("review"); setError(null); }}
+            onClick={() => {
+              setStep("review");
+              setError(null);
+            }}
             className="mt-4 btn-ghost text-sm py-2"
           >
             Try again
@@ -335,7 +409,11 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <Suspense fallback={<div className="pt-24 px-4 text-gray-500">Loading...</div>}>
+      <Suspense
+        fallback={
+          <div className="pt-24 px-4 text-gray-500">Loading...</div>
+        }
+      >
         <RegisterForm />
       </Suspense>
     </div>
