@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
+import { FreighterProvider } from "@/context/FreighterContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,19 +30,21 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-dark-900 text-white antialiased">
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: "#1a1a26",
-              color: "#fff",
-              border: "1px solid #32324a",
-              borderRadius: "8px",
-              fontFamily: "DM Sans, sans-serif",
-            },
-          }}
-        />
-        {children}
+        <FreighterProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: "#1a1a26",
+                color: "#fff",
+                border: "1px solid #32324a",
+                borderRadius: "8px",
+                fontFamily: "DM Sans, sans-serif",
+              },
+            }}
+          />
+          {children}
+        </FreighterProvider>
       </body>
     </html>
   );
