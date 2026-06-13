@@ -64,13 +64,27 @@ export async function submitAndConfirm(
   signedXdr: string
 ): Promise<{ txHash: string; success: boolean }> {
   const tx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
-  const response = await server.sendTransaction(tx);
-  const txHash = response.hash;
 
-  if (response.status === "ERROR") {
-    throw new Error(`Submit error: ${JSON.stringify(response.errorResult)}`);
+  let txHash: string;
+  try {
+    const response = await server.sendTransaction(tx);
+    txHash = response.hash;
+
+    if (response.status === "ERROR") {
+      throw new Error(`Submit error: ${JSON.stringify(response.errorResult)}`);
+    }
+  } catch (e: any) {
+    // Some SDK versions throw "Bad union switch" while parsing the
+    // sendTransaction response even though submission succeeded.
+    // Compute the hash manually from the transaction itself as fallback.
+    if (e?.message?.includes("Bad union")) {
+      txHash = tx.hash().toString("hex");
+    } else {
+      throw e;
+    }
   }
 
+  // Poll for confirmation
   let attempts = 0;
   while (attempts < 20) {
     await new Promise((r) => setTimeout(r, 1500));
@@ -85,7 +99,7 @@ export async function submitAndConfirm(
         e?.message?.includes("Bad union") ||
         e?.message?.includes("not found")
       ) {
-        // Still pending, keep polling
+        // still pending
       } else {
         throw e;
       }
